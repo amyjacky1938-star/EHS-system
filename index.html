@@ -97,7 +97,7 @@
         .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
         .photo-box { background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; overflow: hidden; }
         .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
-        .photo-box img { width: 100%; height: 160px; max-height: 160px; object-fit: contain; border-radius: 4px; background: #cbd5e1; cursor: pointer; transition: 0.2s; }
+        .photo-box img { width: 100%; height: 160px; max-height: 160px; object-fit: cover; border-radius: 4px; background: #cbd5e1; cursor: pointer; transition: 0.2s; }
         .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
 
         .action-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
@@ -504,14 +504,14 @@
         return "";
     }
 
-    function compressImage(file, callback) {
+ function compressImage(file, callback) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
                 let width = img.width;
                 let height = img.height;
-                const GOLDEN_WIDTH = 550;
+                const GOLDEN_WIDTH = 1000; // 提升解析度寬度
                 if (width > GOLDEN_WIDTH) {
                     height = height * (GOLDEN_WIDTH / width);
                     width = GOLDEN_WIDTH;
@@ -524,9 +524,43 @@
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                let quality = 0.7;
+                let quality = 0.82; // 提高初始畫質
                 let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                while (compressedBase64.length > 29000 && quality > 0.15) {
+                // 放寬大小限制以保留清晰度
+                while (compressedBase64.length > 95000 && quality > 0.3) {
+                    quality -= 0.05;
+                    compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                }
+                callback(compressedBase64);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function compressWorkerImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                let width = img.width;
+                let height = img.height;
+                const WORKER_WIDTH = 1000;
+                if (width > WORKER_WIDTH) {
+                    height = height * (WORKER_WIDTH / width);
+                    width = WORKER_WIDTH;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                let quality = 0.82;
+                let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                while (compressedBase64.length > 95000 && quality > 0.3) {
                     quality -= 0.05;
                     compressedBase64 = canvas.toDataURL('image/jpeg', quality);
                 }
@@ -941,7 +975,7 @@
                     let reportDate = new Date(item.reportTime.replace(/\//g, '-'));
                     let now = new Date();
                     let diffDays = (now - reportDate) / (1000 * 60 * 60 * 24);
-                    if (diffDays > 3) return true;
+                    if (diffDays > 14) return true;
                 }
             }
             return false;
