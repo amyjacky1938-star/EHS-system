@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EHS 職安衛通報系統 | Pro Ultra</title>
+    <style>
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-bg: #f8fafc;
+            --text-main: #334155;
+            --modal-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            --card-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .hidden { display: none !important; }
+
+        /* 讀取遮罩 */
+        #loadingOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10000; color: white; font-size: 18px; font-weight: bold;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 12px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 登入區塊 */
+        .login-container {
+            max-width: 400px; margin: 60px auto; background: white; padding: 30px;
+            border-radius: 12px; box-shadow: var(--modal-shadow); text-align: center;
+        }
+        .login-container h2 { color: var(--primary); margin-bottom: 24px; }
+        .form-group { text-align: left; margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 6px; color: #475569; }
+        input, select, textarea {
+            width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+            font-size: 14px; box-sizing: border-box; background: var(--gray-bg);
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary-light); outline: none; background: white; }
+
+        /* 主程式區塊 */
+        .app-container { max-width: 600px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+        header { background: var(--primary); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin: 0; font-size: 18px; }
+        
+        /* 頁籤導覽 */
+        .tabs { display: flex; background: #e0f2fe; border-bottom: 1px solid #e2e8f0; }
+        .tab { flex: 1; text-align: center; padding: 12px 6px; font-size: 13px; font-weight: bold; color: #64748b; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: white; }
+
+        .page-content { padding: 20px; }
+
+        /* 按鈕基本樣式 */
+        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-submit:hover { background: var(--primary-light); }
+        .btn-logout { background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+        /* 篩選器與清單 */
+        .filter-section { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+        .filter-badge { padding: 6px 14px; background: #e2e8f0; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; color: #475569; transition: 0.2s; }
+        .filter-badge.active { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; font-weight: bold; }
+        .defect-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: var(--card-shadow); transition: 0.2s; cursor: pointer; }
+        .defect-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.08); }
+        .defect-header { display: flex; justify-content: space-between; align-items: center; }
+        
+        /* 標籤 Badge 樣式 */
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 4px; }
+        .badge-category { background: #f1f5f9; color: #1e3a8a; border: 1px solid #cbd5e1; }
+        .badge.todo { background: #fef2f2; color: #ef4444; border: 1px solid #fee2e2; }
+        .badge.processing { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+        .badge.checking { background: #fffbeb; color: #d97706; border: 1px solid #fef3c7; }
+        .badge.done { background: #ecfdf5; color: #10b981; border: 1px solid #d1fae5; }
+
+        .stamp-box { font-size: 11px; color: #94a3b8; margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 6px; }
+
+        /* 照片比對排版 */
+        .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
+        .photo-box { background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; overflow: hidden; }
+        .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
+        .photo-box img { width: 100%; height: 160px; max-height: 160px; object-fit: contain; border-radius: 4px; background: #cbd5e1; cursor: pointer; transition: 0.2s; }
+        .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
+
+        .action-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .action-btn.worker { background: #2563eb; color: white; }
+        .action-btn.approve { background: #22c55e; color: white; flex: 1; }
+        .action-btn.reject { background: #ef4444; color: white; flex: 1; }
+    </style>
+</head>
+<body>
+
+    <div id="loadingOverlay" class="hidden">
+        <div class="spinner"></div>
+        <div id="loadingText">雲端資料同步中，請稍後...</div>
+        <button onclick="showLoading(false)" style="margin-top: 15px; background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">⚠️ 強制停止畫面 (取消等待)</button>
+    </div>
+
+    <div id="loginSection" class="login-container">
+        <img src="https://cdn.phototourl.com/free/2026-05-12-aea1713e-4f2a-46d6-a473-93fb2a3448ba.png" alt="Company LOGO" style="max-width: 200px; max-height: 55px; object-fit: contain; margin-bottom: 16px;">
+        <h2 style="margin-top: 0;">EHS 通報系統 | Pro</h2>
+        <div class="form-group">
+            <label>您的姓名</label>
+            <input type="text" id="regName" placeholder="例如：張小明">
+        </div>
+        <div class="form-group">
+            <label>所屬部門</label>
+            <select id="regDept">
+                <option value="勞安室">勞安室</option>
+                <option value="管理部">管理部</option>
+                <option value="製造一部">製造一部</option>
+                <option value="製造二部">製造二部</option>
+                <option value="製造三部">製造三部</option>
+                <option value="光纖業務部">光纖業務部</option>
+                <option value="研發一部">研發一部</option>
+                <option value="研發二部">研發二部</option>
+                <option value="研發三部">研發三部</option>
+                <option value="研發四部">研發四部</option>
+                <option value="集團人資處">集團人資處</option>
+                <option value="集團資訊處">集團資訊處</option>
+                <option value="集團財務處">集團財務處</option>
+                <option value="集團業務中心">集團業務中心</option>
+                <option value="專案開發部">專案開發部</option>
+                <option value="工程部">工程部</option>
+                <option value="品保部">品保部</option>
+                <option value="專利商標部">專利商標部</option>
+                <option value="資材部">資材部</option>
+                <option value="品質中心">品質中心</option>
+                <option value="總經理室">總經理室</option>
+                <option value="永續發展部">永續發展部</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>系統操作權限角色</label>
+            <select id="regRole" onchange="togglePasswordInput()">
+                <option value="reporter">1. 現場通報同仁 (Reporter)</option>
+                <option value="worker">2. 工務維修同仁 (Worker)</option>
+                <option value="manager">3. 簽核審查主管 (Manager)</option>
+            </select>
+        </div>
+
+        <!-- 內嵌式工號欄位（免密碼白名單驗證） -->
+        <div class="form-group hidden" id="authGroup" style="border-left: 4px solid var(--warning); padding-left: 10px; background: #fffbeb; padding-top: 8px; padding-bottom: 8px; border-radius: 0 6px 6px 0;">
+            <label style="color: #d97706; margin-bottom: 4px;">🆔 員工工號 (密碼識別)</label>
+            <input type="text" id="regEmpId" placeholder="請輸入授權工號" style="background: white;">
+        </div>
+
+        <button onclick="registerUser()" class="btn-submit">進入通報系統</button>
+    </div>
+
+    <div id="appSection" class="app-container hidden">
+        <header>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="background: white; padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <img src="https://cdn.phototourl.com/free/2026-05-12-aea1713e-4f2a-46d6-a473-93fb2a3448ba.png" alt="LOGO" style="height: 22px; max-width: 110px; object-fit: contain;">
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 1px;">
+                    <span id="userDisplay" style="font-weight: bold; font-size: 14px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span> 
+                    <span id="roleDisplay" style="font-size: 10px; background: rgba(255,255,255,0.2); padding: 1px 4px; border-radius: 3px;">-</span>
+                </div>
+            </div>
+            <button onclick="executeLogout()" class="btn-logout">切換帳號</button>
+        </header>
+
+        <!-- 3 個分頁導覽列 -->
+        <div class="tabs">
+            <div id="tab1" class="tab" onclick="switchTab(1)">
+                <i class="fas fa-edit"></i> 新增通報
+            </div>
+            <div id="tab2" class="tab active" onclick="switchTab(2)">
+                <i class="fas fa-search"></i> 缺失清單
+            </div>
+            <div id="tab3" class="tab" onclick="switchTab(3)">
+                <i class="fas fa-chart-pie"></i> 數據統計
+            </div>
+        </div>
+
+        <!-- 頁籤 1：新增安全通報 -->
+        <div id="page1" class="page-content hidden">
+            <div class="form-group">
+                <label>📍 廠區棟別</label>
+                <select id="inputFactory">
+                    <option value="本廠">本廠 (J1)</option>
+                    <option value="二廠">二廠 (J2)</option>
+                    <option value="三廠">三廠 (J3)</option>
+                    <option value="宿舍">宿舍 (DORM)</option>
+                    <option value="KD大樓">KD大樓</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🏢 樓層定位</label>
+                <select id="inputFloor">
+                    <option value="1F">1 樓 (1F)</option>
+                    <option value="2F">2 樓 (2F)</option>
+                    <option value="3F">3 樓 (3F)</option>
+                    <option value="4F">4 樓 (4F)</option>
+                    <option value="5F">5 樓 (5F)</option>
+                    <option value="6F">6 樓 (6F)</option>
+                    <option value="7F">7 樓 (7F)</option>
+                    <option value="8F">8 樓 (8F)</option>
+                    <option value="9F">9 樓 (9F)</option>
+                    <option value="10F">10 樓 (10F)</option>
+                    <option value="B1">地下室 (B1F)</option>
+                    <option value="B2">地下室 (B2F)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🔍 詳細地點位置</label>
+                <input type="text" id="inputLocation" placeholder="例如：A棟配電室旁、西側安全梯口">
+            </div>
+
+            <div class="form-group">
+                <label>📋 通報分類</label>
+                <select id="inputCategory" style="background: white;">
+                    <option value="" disabled selected>請選擇類別</option>
+                    <option value="設施與結構類">設施與結構類 (如：牆面破損、地板凹陷、門窗天花板損壞)</option>
+                    <option value="機電與照明類">機電與照明類 (如：配電盤、插座開關、照明燈具故障)</option>
+                    <option value="空調與消防類">空調與消防類 (如：滅火器受阻、消防栓、空調冰水機)</option>
+                    <option value="環安與防護類">環安與防護類 (如：防護具缺失、護欄破損、化學品標示)</option>
+                    <option value="其他">其他</option>
+                </select>
+                <!-- 常用分類快速帶入按鈕 -->
+                <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">
+                    <span style="font-size: 11px; color: #64748b; align-self: center;">💡 快速選擇：</span>
+                    <button type="button" onclick="setCategory('設施與結構類')" style="font-size: 10px; background: #e2e8f0; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">🏢 設施結構</button>
+                    <button type="button" onclick="setCategory('機電與照明類')" style="font-size: 10px; background: #e2e8f0; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">⚡ 機電照明</button>
+                    <button type="button" onclick="setCategory('空調與消防類')" style="font-size: 10px; background: #e2e8f0; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">🧯 空調消防</button>
+                    <button type="button" onclick="setCategory('環安與防護類')" style="font-size: 10px; background: #e2e8f0; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer;">🛡️ 環安防護</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="border-left: 4px solid var(--danger); padding-left: 12px; background: #fff5f5; padding-top:10px; padding-bottom:10px; border-radius:0 8px 8px 0;">
+                <label style="color:var(--danger)">🚨 缺失異常具體說明</label>
+                
+                <!-- 常見缺失快速帶入按鈕 -->
+                <div style="margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+                    <span style="font-size: 12px; color: #64748b; align-self: center;">⚡ 常用範本：</span>
+                    <button type="button" onclick="insertTemplate('滅火器壓力異常或前方遭雜物擋道')" style="font-size: 11px; background: #e2e8f0; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer;">🧯 滅火器受阻</button>
+                    <button type="button" onclick="insertTemplate('走道堆放雜物影響逃生動線')" style="font-size: 11px; background: #e2e8f0; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer;">📦 動線堆雜物</button>
+                    <button type="button" onclick="insertTemplate('走廊或廠區照明燈具故障不亮')" style="font-size: 11px; background: #e2e8f0; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer;">💡 照明故障</button>
+                </div>
+
+                <textarea id="inputDescription" rows="3" placeholder="請詳細描述現場發現的異常狀況..."></textarea>
+                
+                <label style="margin-top:12px; color:var(--danger)">📸 現場缺失拍照上傳 (🚀 雙相機高清密度模式)</label>
+                <input type="file" id="photoFile" accept="image/*" style="background:white; border:1px solid #fca5a5;">
+            </div>
+
+            <button onclick="executeReportSubmit()" class="btn-submit">送出異常通報</button>
+        </div>
+
+        <!-- 頁籤 2：缺失追蹤清單 -->
+        <div id="page2" class="page-content">
+            <div class="filter-section" style="margin-bottom: 12px;">
+                <div id="f-stat-all" class="filter-badge active" onclick="setFilter('status','ALL')">全部單據</div>
+                <div id="f-stat-0" class="filter-badge" onclick="setFilter('status','0')">🔴 待處理</div>
+                <div id="f-stat-3" class="filter-badge" onclick="setFilter('status','3')">🟠 處理中</div>
+                <div id="f-stat-1" class="filter-badge" onclick="setFilter('status','1')">🟡 待審核</div>
+                <div id="f-stat-2" class="filter-badge" onclick="setFilter('status','2')">🟢 已結案</div>
+                <div id="f-stat-mine" class="filter-badge" onclick="setFilter('status','MINE')">🙋‍♂️ 我的通報</div>
+            </div>
+
+            <!-- 2 欄式佈局（廠區、樓層） -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div>
+                    <label style="font-size: 11px; font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">🏢 廠區篩選</label>
+                    <select id="filterFactory" onchange="setSelectFilter('factory', this.value)" style="padding: 6px; font-size: 12px; background: white;">
+                        <option value="ALL">全部廠區</option>
+                        <option value="本廠">本廠 (J1)</option>
+                        <option value="二廠">二廠 (J2)</option>
+                        <option value="三廠">三廠 (J3)</option>
+                        <option value="宿舍">宿舍 (DORM)</option>
+                        <option value="KD大樓">KD大樓</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: bold; color: #475569; display: block; margin-bottom: 4px;">🪜 樓層篩選</label>
+                    <select id="filterFloor" onchange="setSelectFilter('floor', this.value)" style="padding: 6px; font-size: 12px; background: white;">
+                        <option value="ALL">全部樓層</option>
+                        <option value="1F">1 樓 (1F)</option>
+                        <option value="2F">2 樓 (2F)</option>
+                        <option value="3F">3 樓 (3F)</option>
+                        <option value="4F">4 樓 (4F)</option>
+                        <option value="5F">5 樓 (5F)</option>
+                        <option value="6F">6 樓 (6F)</option>
+                        <option value="7F">7 樓 (7F)</option>
+                        <option value="8F">8 樓 (8F)</option>
+                        <option value="9F">9 樓 (9F)</option>
+                        <option value="10F">10 樓 (10F)</option>
+                        <option value="B1">地下室 (B1F)</option>
+                        <option value="B2">地下室 (B2F)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="list-header">
+                <span>🔔 目前篩選項目</span>
+                <span>共計 <span id="defectCount" style="color:var(--primary)">0</span> 筆</span>
+            </div>
+
+            <div id="noDefectMessage" class="hidden" style="text-align:center; padding:40px; color:#94a3b8; font-size:14px;">
+                🎉 目前沒有符合篩選條件的缺失案件。
+            </div>
+
+            <div id="defectListContainer"></div>
+        </div>
+
+        <!-- 頁籤 3：數據統計圖表 -->
+        <div id="page3" class="page-content hidden">
+            <!-- 統計時間區間快速切換按鈕 -->
+            <div style="margin-bottom: 16px; display: flex; justify-content: center; gap: 8px;">
+                <button onclick="setChartTimeFilter('ALL')" id="btn-chart-all" style="padding: 6px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: var(--primary); color: white; cursor: pointer; font-size: 12px; font-weight: bold;">全部資料</button>
+                <button onclick="setChartTimeFilter('MONTH')" id="btn-chart-month" style="padding: 6px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; cursor: pointer; font-size: 12px; font-weight: bold;">📅 當月統計</button>
+                <button onclick="setChartTimeFilter('YEAR')" id="btn-chart-year" style="padding: 6px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: #e2e8f0; color: #475569; cursor: pointer; font-size: 12px; font-weight: bold;">📈 本年度統計</button>
+            </div>
+
+            <!-- 分類圓餅圖 -->
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; box-shadow: var(--card-shadow); margin-bottom: 16px;">
+                <h3 style="margin: 0 0 6px 0; font-size: 16px; color: var(--primary);"><i class="fas fa-chart-pie"></i> 各類通報佔比統計分析</h3>
+
+                <div id="chartDateRange" style="font-size: 13px; color: #64748b; font-weight: bold; margin-bottom: 16px;">
+                    📅 統計區間：載入中...
+                </div>
+                
+                <div style="max-width: 280px; margin: auto;">
+                    <canvas id="categoryPieChart"></canvas>
+                </div>
+                <button onclick="downloadChart('categoryPieChart', '各類通報佔比統計圖.png')" style="margin-top: 12px; background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">
+                    📥 下載圓餅圖檔案
+                </button>
+                <p style="font-size: 12px; color: #64748b; margin-top: 16px;">本圖表根據選擇的時間區間即時計算分類佔比。</p>
+            </div>
+
+            <!-- 各廠區缺失通報數量 -->
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; box-shadow: var(--card-shadow);">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px; color: var(--primary);"><i class="fas fa-building"></i> 各廠區缺失通報數量比較</h3>
+                <div style="height: 260px; position: relative;">
+                    <canvas id="factoryBarChart"></canvas>
+                </div>
+                <button onclick="downloadChart('factoryBarChart', '各廠區缺失通報數量比較圖.png')" style="margin-top: 12px; background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">
+                    📥 下載長條圖檔案
+                </button>
+                <p style="font-size: 12px; color: #64748b; margin-top: 16px;">點擊各廠區長條可檢視各類型通報明細並自動篩選。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細資訊互動視窗 -->
+    <div id="detailModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 15px; box-sizing: border-box;">
+        <div style="background: white; padding: 20px; border-radius: 12px; max-width: 480px; width: 100%; max-height:95vh; overflow-y:auto; box-shadow: var(--modal-shadow); color: #334155; box-sizing: border-box;">
+            <h3 style="font-size: 18px; font-weight: bold; margin-top:0; margin-bottom: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; color: #1e293b; text-align:center;">📋 通報缺失詳細資訊</h3>
+            
+            <div style="display: grid; grid-template-columns: 80px 1fr; gap: 6px; font-size: 13px; margin-bottom: 14px; line-height: 1.4; text-align: left; background:#f0f9ff; padding:12px; border-radius:8px; border: 1px solid #bae6fd;">
+                <span style="color: #64748b;">單據編號:</span> <span id="detId" style="font-weight: 600; font-family:monospace;">-</span>
+                <span style="color: #64748b;">廠區棟別:</span> <span id="detFactory">-</span>
+                <span style="color: #64748b;">樓層定位:</span> <span id="detFloor">-</span>
+                <span style="color: #64748b;">通報人員:</span> <span id="detReporter">-</span>
+                <span style="color: #64748b;">詳細地點:</span> <span id="detLocation" style="font-weight:600;">-</span>
+                <span style="color: #64748b;">通報時間:</span> <span id="detReportTime" style="color: #1e3a8a; font-weight: bold;">-</span>
+                <span style="color: #64748b; grid-column:1/3;">狀況說明:</span> 
+                <span id="detDescription" style="grid-column:1/3; color: #ef4444; font-weight: 600; background:#fff; padding:6px; border:1px solid #fee2e2; border-radius:4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">-</span>
+            </div>
+
+            <div style="font-size:11px; color:var(--primary-light); text-align:center; margin-bottom:-4px;"><i class="fas fa-search-plus"></i> 點選下方照片可全螢幕放大瀏覽圖片</div>
+            <div class="photo-grid">
+                <div class="photo-box">
+                    <span>📸 通報缺失照</span>
+                    <img id="imgBefore" src="https://placehold.co/400x300?text=Loading..." alt="通報缺陷照" onclick="openLightbox(this)">
+                </div>
+                <div class="photo-box">
+                    <span>🛠️ 改善完成照</span>
+                    <img id="imgAfter" src="https://placehold.co/400x300?text=Loading..." alt="維修完成照" onclick="openLightbox(this)">
+                </div>
+            </div>
+
+            <!-- 工務處理區塊 -->
+            <div id="workerSection" style="background: #fff7ed; padding: 12px; border-radius: 8px; border: 1px dashed #fed7aa; margin-bottom: 14px; text-align: left; display:none;"></div>
+
+            <!-- 主管審核控制台 -->
+            <div id="managerSection" style="background: #eff6ff; padding: 12px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 14px; text-align: left; display:none;">
+                <h4 style="font-weight: bold; color: #1e40af; margin-top: 0; margin-bottom: 8px; font-size: 14px;">👑 主管審核控制台</h4>
+                <textarea id="managerCommentInput" rows="2" placeholder="請輸入簽核評語、改善提醒或退回理由..." style="background:#fff; border:1px solid #bfdbfe; margin-bottom:10px; font-size:13px; display:none;"></textarea>
+                <div id="managerCommentView" style="background: #fff; padding: 8px; border-radius: 4px; border: 1px dashed #bfdbfe; font-size: 13px; color: #1e3a8a; margin-bottom: 6px; display:none;"></div>
+                <div id="managerMeta" style="font-size:11px; color:#64748b; margin-bottom:8px; text-align:right;"></div>
+                <div id="managerActionButtons" style="display: none; gap: 10px;">
+                    <button onclick="submitAudit('APPROVE', '已結案')" class="action-btn approve">✅ 核准結案</button>
+                    <button onclick="submitAudit('REJECT', '待處理')" class="action-btn reject">❌ 退回重做</button>
+                </div>
+            </div>
+
+            <div style="text-align: right; border-top:1px solid #e2e8f0; padding-top:10px;">
+                <button onclick="closeDetailModal()" style="background: #64748b; color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight:bold;">關閉視窗</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 圖片燈箱預覽 -->
+    <div id="imageLightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.95); z-index: 100000; justify-content: center; align-items: center; cursor: zoom-out;" onclick="closeLightbox()">
+        <img id="lightboxImg" style="max-width: 98%; max-height: 98%; border-radius: 4px; box-shadow: 0 4px 25px rgba(0,0,0,0.7); transition: transform 0.1s ease; object-fit: contain;">
+    </div>
+
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+    const POWER_AUTOMATE_SAVE_URL = "https://default5e08b912309f4900b9e179fae11d8e.2a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/07/workflows/ae80a43b0d5e4062bf5b532833b1dad0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2DYPzn3BsDuCv6xsFn-pwC7wtxo1nTdakVZscqYmbMo";
+    const POWER_AUTOMATE_GET_URL = "https://default5e08b912309f4900b9e179fae11d8e.2a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/10/workflows/7637f49fb50f46e1a769b1951f916f06/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YTv8NBrnDnNTtjE2TnWsE7oF5Zn39ksRfjjXuco-6iA";
+
+    // 定義合法的授權工號白名單陣列（作為密碼識別）
+    const VALID_EMP_IDS = [
+        "100032", "720317", "100239", "100310", "101284", 
+        "720292", "720299", "102295", "102791", "102357"
+    ];
+
+    let currentUserRole = "reporter";
+    let currentUserRealName = "";
+    let currentDefectPhotoBase64 = ""; 
+    let currentWorkerPhotoBase64 = ""; 
+    let mockDatabase = [];
+    
+    let currentFilters = { status: "ALL", factory: "ALL", floor: "ALL" };
+    let currentChartFilter = "ALL"; // 'ALL', 'MONTH', 'YEAR'
+    let currentEditingItem = null;
+
+    let myPieChart = null;
+    let myFactoryChart = null;
+
+    // 廠區專屬色彩設定函式[cite: 2]
+    function getFactoryBadgeStyle(factory) {
+        switch(factory) {
+            case '本廠': return 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'; // 藍色系
+            case '二廠': return 'background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;'; // 綠色系
+            case '三廠': return 'background: #fffbeb; color: #b45309; border: 1px solid #fde68a;'; // 琥珀/黃色系
+            case '宿舍': return 'background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff;'; // 紫色系
+            case 'KD大樓': return 'background: #fff1f2; color: #be123c; border: 1px solid #fecdd3;'; // 紅/玫瑰色系
+            default: return 'background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;';
+        }
+    }
+
+    // 樓層專屬色彩設定函式[cite: 2]
+    function getFloorBadgeStyle(floor) {
+        if (!floor) return 'background: #f8fafc; color: #475569; border: 1px solid #cbd5e1;';
+        if (floor.includes('B')) {
+            return 'background: #1e293b; color: #f8fafc; border: 1px solid #0f172a;'; // 地下室：深色系
+        }
+        const num = parseInt(floor) || 1;
+        const colors = [
+            'background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;', // 1F: 亮藍
+            'background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;', // 2F: 青綠
+            'background: #fdf4ff; color: #a21caf; border: 1px solid #f5d0fe;', // 3F: 粉紫
+            'background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5;', // 4F: 暖橘
+            'background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;'  // 5F以上: 柔紅
+        ];
+        return colors[(num - 1) % colors.length];
+    }
+
+    function getFormattedTime() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+
+    function parseDateValue(val) {
+        if (!val || val === "null" || val === "undefined") return '-';
+        val = String(val).trim();
+        if (!isNaN(val) && parseFloat(val) > 40000 && parseFloat(val) < 60000) {
+            const serial = parseFloat(val);
+            const excelEpoch = new Date(1899, 11, 30);
+            const msInDay = 24 * 60 * 60 * 1000;
+            const dt = new Date(excelEpoch.getTime() + serial * msInDay);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${dt.getFullYear()}/${pad(dt.getMonth() + 1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+        }
+        return val; 
+    }
+
+    function getProp(obj, keyName) {
+        if (!obj) return "";
+        if (obj[keyName] !== undefined && obj[keyName] !== null) return String(obj[keyName]);
+        const target = keyName.toLowerCase().trim();
+        for (let k in obj) {
+            if (k.toLowerCase().trim() === target) {
+                return String(obj[k]);
+            }
+        }
+        return "";
+    }
+
+    function compressImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                let width = img.width;
+                let height = img.height;
+                const GOLDEN_WIDTH = 550;
+                if (width > GOLDEN_WIDTH) {
+                    height = height * (GOLDEN_WIDTH / width);
+                    width = GOLDEN_WIDTH;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                let quality = 0.7;
+                let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                while (compressedBase64.length > 29000 && quality > 0.15) {
+                    quality -= 0.05;
+                    compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                }
+                callback(compressedBase64);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function compressWorkerImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                let width = img.width;
+                let height = img.height;
+                const WORKER_WIDTH = 450;
+                if (width > WORKER_WIDTH) {
+                    height = height * (WORKER_WIDTH / width);
+                    width = WORKER_WIDTH;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'medium';
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                let quality = 0.6;
+                let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                while (compressedBase64.length > 28000 && quality > 0.1) {
+                    quality -= 0.05;
+                    compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                }
+                callback(compressedBase64);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function formatBase64Src(str) {
+        if (!str || str === "undefined" || str === "null" || str.trim() === "") {
+            return "https://placehold.co/400x300?text=No+Image";
+        }
+        let clean = str.trim().replace(/^"|"$/g, '').replace(/\\/g, '').replace(/\s/g, '');   
+        if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image')) {
+            return clean;
+        }
+        if (clean.length > 30) return "data:image/jpeg;base64," + clean;
+        return "https://placehold.co/400x300?text=No+Image";
+    }
+
+    function openLightbox(imgElement) {
+        const lightbox = document.getElementById('imageLightbox');
+        const lightboxImg = document.getElementById('lightboxImg');
+        if (imgElement && imgElement.src && !imgElement.src.includes('placehold.co')) {
+            lightboxImg.src = imgElement.src;
+            lightbox.style.display = 'flex';
+        }
+    }
+    function closeLightbox() { document.getElementById('imageLightbox').style.display = 'none'; }
+
+    document.getElementById('photoFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if(file) {
+            compressImage(file, function(base64) {
+                currentDefectPhotoBase64 = base64;
+            });
+        }
+    });
+
+    function insertTemplate(text) {
+        document.getElementById('inputDescription').value = text;
+    }
+
+    function setCategory(cat) {
+        document.getElementById('inputCategory').value = cat;
+    }
+
+    function showLoading(show) { document.getElementById('loadingOverlay').classList.toggle('hidden', !show); }
+
+    function togglePasswordInput() {
+        const role = document.getElementById('regRole').value;
+        const authGroup = document.getElementById('authGroup');
+        if (role === 'worker' || role === 'manager') {
+            authGroup.classList.remove('hidden');
+        } else {
+            authGroup.classList.add('hidden');
+        }
+    }
+
+    function refreshDataFromCloud(isBackground = false) {
+        if (!POWER_AUTOMATE_GET_URL) return;
+        if (!isBackground) showLoading(true);
+
+        fetch(POWER_AUTOMATE_GET_URL, { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "GET_DATA" }) 
+        })
+        .then(res => res.json())
+        .then(data => {
+            let finalData = Array.isArray(data) ? data : (data.data || []);
+            mockDatabase = finalData.map(item => ({
+                id: getProp(item, "id"),
+                factory: getProp(item, "factory"),
+                floor: getProp(item, "floor"),
+                location: getProp(item, "location"),
+                category: getProp(item, "category") || "其他",
+                status: getProp(item, "status") || "待處理",
+                description: getProp(item, "description"),
+                reporterName: getProp(item, "reporterName"),
+                reportTime: parseDateValue(getProp(item, "reportTime")), 
+                beforePhoto: getProp(item, "beforePhoto"),               
+                afterPhoto: getProp(item, "afterPhoto"),                 
+                receiverName: getProp(item, "receiverName"),
+                receivedTime: parseDateValue(getProp(item, "receivedTime")),
+                receiveNote: getProp(item, "receiveNote"),
+                workerName: getProp(item, "workerName"),
+                workerTime: parseDateValue(getProp(item, "workerTime")),
+                workerDesc: getProp(item, "workerDesc"),
+                managerName: getProp(item, "managerName"),
+                managerComment: getProp(item, "managerComment"),
+                managerTime: parseDateValue(getProp(item, "managerTime")),
+                rawItem: item 
+            }));
+            renderDefectList();
+            renderCategoryPieChart();
+            renderFactoryBarChart();
+            updateChartDateRange();
+        })
+        .catch(err => { console.error(err); })
+        .finally(() => { if (!isBackground) showLoading(false); });
+    }
+
+    function saveToCloud(actionType, itemData) {
+        if (!POWER_AUTOMATE_SAVE_URL) return;
+        showLoading(true);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => { controller.abort(); }, 15000); 
+
+        fetch(POWER_AUTOMATE_SAVE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                action: String(actionType),
+                id: String(itemData.id || ""),
+                factory: String(itemData.factory || ""),
+                floor: String(itemData.floor || ""),
+                location: String(itemData.location || ""),
+                category: String(itemData.category || "其他"),
+                status: String(itemData.status || "待處理"),
+                description: String(itemData.description || ""),
+                reporterName: String(itemData.reporterName || ""),
+                reportTime: String(itemData.reportTime || ""),
+                beforePhoto: String(itemData.beforePhoto || ""), 
+                afterPhoto: String(itemData.afterPhoto || ""),   
+                receiverName: String(itemData.receiverName || ""),
+                receivedTime: String(itemData.receivedTime || ""),
+                receiveNote: String(itemData.receiveNote || ""),
+                workerName: String(itemData.workerName || ""),
+                workerTime: String(itemData.workerTime || ""),
+                workerDesc: String(itemData.workerDesc || ""),
+                managerName: String(itemData.managerName || ""),
+                managerComment: String(itemData.managerComment || ""), 
+                managerTime: String(itemData.managerTime || "")
+            }),
+            signal: controller.signal 
+        })
+        .then(res => {
+            clearTimeout(timeoutId); 
+            if (res.ok) {
+                alert("🎉 資料已成功更新至雲端！");
+                refreshDataFromCloud(true);
+            } else {
+                alert(`❌ 寫入失敗 (伺服器錯誤: ${res.status})，請確認 Excel 是否被鎖定後重試！`);
+            }
+        })
+        .catch(err => {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+                alert("⚠️ 傳送超時！微軟後台 Excel 反應過慢，請先確認無人鎖定 Excel 再重試！");
+            } else {
+                console.error(err);
+            }
+        })
+        .finally(() => { showLoading(false); });
+    }
+
+    function registerUser() {
+        const inputName = document.getElementById('regName').value.trim();
+        if (!inputName) { alert("請輸入您的真實姓名！"); return; }
+
+        const selectedRole = document.getElementById('regRole').value;
+
+        if (selectedRole === 'worker' || selectedRole === 'manager') {
+            const empIdInput = document.getElementById('regEmpId').value.trim();
+            
+            if (!empIdInput) {
+                alert("❌ 請輸入員工工號！");
+                document.getElementById('regEmpId').focus();
+                return;
+            }
+
+            if (!VALID_EMP_IDS.includes(empIdInput)) {
+                alert(`❌ 查無此工號 (${empIdInput}) 或權限不符，請重新確認！`);
+                document.getElementById('regEmpId').focus();
+                return;
+            }
+        }
+
+        currentUserRealName = `${inputName}(${document.getElementById('regDept').value})`;
+        currentUserRole = selectedRole;
+
+        document.getElementById('loginSection').className = "hidden";
+        document.getElementById('appSection').className = "";
+        document.getElementById('userDisplay').innerText = currentUserRealName;
+        document.getElementById('roleDisplay').innerText = currentUserRole;
+
+        const tab1 = document.getElementById('tab1');
+        if (currentUserRole === 'worker' || currentUserRole === 'manager') {
+            tab1.style.display = 'none';
+            switchTab(2);
+        } else {
+            tab1.style.display = 'flex';
+            switchTab(1);
+        }
+
+        resetFilters(); 
+        refreshDataFromCloud();
+    }
+
+    function executeLogout() {
+        document.getElementById('appSection').className = "hidden";
+        document.getElementById('loginSection').className = "";
+        document.getElementById('regEmpId').value = "";
+    }
+
+    function switchTab(tabNum) {
+        document.getElementById('tab1').classList.toggle('active', tabNum === 1);
+        document.getElementById('tab2').classList.toggle('active', tabNum === 2);
+        document.getElementById('tab3').classList.toggle('active', tabNum === 3);
+        
+        document.getElementById('page1').classList.toggle('hidden', tabNum !== 1);
+        document.getElementById('page2').classList.toggle('hidden', tabNum !== 2);
+        document.getElementById('page3').classList.toggle('hidden', tabNum !== 3);
+
+        if (tabNum === 3) {
+            setTimeout(() => {
+                renderCategoryPieChart();
+                renderFactoryBarChart();
+                updateChartDateRange();
+            }, 50);
+        }
+    }
+
+    function executeReportSubmit() {
+        const desc = document.getElementById('inputDescription').value.trim();
+        if (!desc) { alert("❌ 請填寫異常缺失說明！"); return; }
+
+        const category = document.getElementById('inputCategory').value;
+        if (!category) {
+            alert("❌ 請選擇通報分類！");
+            return;
+        }
+
+        const now = new Date();
+        const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+        const todayItems = mockDatabase.filter(item => item.id && item.id.startsWith(dateStr));
+        const serial = String(todayItems.length + 1).padStart(4, '0');
+        const newItem = {
+            id: dateStr + serial,
+            factory: document.getElementById('inputFactory').value,
+            floor: document.getElementById('inputFloor').value,
+            location: document.getElementById('inputLocation').value.trim() || "未註明地點",
+            category: category, 
+            status: "待處理",
+            description: desc,
+            reporterName: currentUserRealName,
+            reportTime: getFormattedTime(),
+            beforePhoto: currentDefectPhotoBase64,
+            afterPhoto: "", receiverName: "", receivedTime: "", receiveNote: "", workerName: "", workerTime: "", workerDesc: "", managerName: "", managerComment: "", managerTime: ""
+        };
+
+        saveToCloud("NEW", newItem);
+        document.getElementById('inputDescription').value = "";
+        document.getElementById('photoFile').value = "";
+        document.getElementById('inputCategory').selectedIndex = 0;
+        currentDefectPhotoBase64 = "";
+    }
+
+    function setFilter(type, value) {
+        currentFilters.status = value;
+        ['ALL', '0', '3', '1', '2', 'MINE'].forEach(v => {
+            const id = v === 'ALL' ? 'f-stat-all' : (v === 'MINE' ? 'f-stat-mine' : `f-stat-${v}`);
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active', value === v);
+        });
+        renderDefectList();
+    }
+
+    function setSelectFilter(type, value) {
+        currentFilters[type] = value;
+        renderDefectList();
+    }
+
+    function resetFilters() {
+        currentFilters = { status: "ALL", factory: "ALL", floor: "ALL" };
+        ['ALL', '0', '3', '1', '2', 'MINE'].forEach(v => {
+            const id = v === 'ALL' ? 'f-stat-all' : (v === 'MINE' ? 'f-stat-mine' : `f-stat-${v}`);
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active', v === 'ALL');
+        });
+        document.getElementById('filterFactory').value = "ALL";
+        document.getElementById('filterFloor').value = "ALL";
+    }
+
+    function setChartTimeFilter(filterType) {
+        currentChartFilter = filterType;
+        
+        // 更新按鈕樣式
+        ['all', 'month', 'year'].forEach(type => {
+            const btn = document.getElementById(`btn-chart-${type}`);
+            if (btn) {
+                if (type === filterType.toLowerCase()) {
+                    btn.style.background = "var(--primary)";
+                    btn.style.color = "white";
+                } else {
+                    btn.style.background = "#e2e8f0";
+                    btn.style.color = "#475569";
+                }
+            }
+        });
+
+        // 重新繪製圖表
+        renderCategoryPieChart();
+        renderFactoryBarChart();
+        updateChartDateRange();
+    }
+
+    function getFilteredDatabaseForCharts() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+
+        return mockDatabase.filter(item => {
+            if (!item.reportTime || item.reportTime === '-') return false;
+            let timeStr = item.reportTime.replace(/-/g, '/');
+            let itemDate = new Date(timeStr);
+            if (isNaN(itemDate.getTime())) return true; // 若解析失敗則保留
+
+            if (currentChartFilter === 'MONTH') {
+                return itemDate.getFullYear() === currentYear && (itemDate.getMonth() + 1) === currentMonth;
+            } else if (currentChartFilter === 'YEAR') {
+                return itemDate.getFullYear() === currentYear;
+            }
+            return true; // 'ALL'
+        });
+    }
+
+    function renderDefectList() {
+        const container = document.getElementById('defectListContainer');
+        container.innerHTML = "";
+
+        let baseFilteredData = mockDatabase.filter(item => {
+            if (currentUserRole === 'reporter') {
+                const myName = currentUserRealName.split('(')[0].trim();
+                const matchDept = currentUserRealName.match(/\((.*?)\)/);
+                const myDept = matchDept ? matchDept[1] : "";
+                
+                const itemReporterRaw = item.reporterName ? item.reporterName.split('(')[0].trim() : "";
+                
+                const isMyReport = (itemReporterRaw === myName);
+                const isMyDept = myDept && item.reporterName && item.reporterName.includes(`(${myDept})`);
+                
+                if (!isMyReport && !isMyDept) return false;
+            }
+
+            if (currentFilters.factory !== "ALL" && item.factory !== currentFilters.factory) return false;
+            if (currentFilters.floor !== "ALL" && item.floor !== currentFilters.floor) return false;
+            return true;
+        });
+
+        const counts = { "待處理": 0, "處理中": 0, "待審核": 0, "已結案": 0 };
+        baseFilteredData.forEach(item => { if(counts.hasOwnProperty(item.status)) counts[item.status]++; });
+        
+        document.getElementById('f-stat-0').innerText = `🔴 待處理 (${counts['待處理']})`;
+        document.getElementById('f-stat-3').innerText = `🟠 處理中 (${counts['處理中']})`;
+        document.getElementById('f-stat-1').innerText = `🟡 待審核 (${counts['待審核']})`;
+        document.getElementById('f-stat-2').innerText = `🟢 已結案 (${counts['已結案']})`;    
+
+        let filteredData = baseFilteredData.filter(item => {
+            if (currentFilters.status !== "ALL" && currentFilters.status !== "MINE") {
+                const statusMap = { "0": "待處理", "3": "處理中", "1": "待審核", "2": "已結案" };
+                if (item.status !== statusMap[currentFilters.status]) return false;
+            }
+            if (currentFilters.status === "MINE") {
+                const myName = currentUserRealName.split('(')[0].trim();
+                const itemReporterRaw = item.reporterName ? item.reporterName.split('(')[0].trim() : "";
+                if (!item.reporterName || itemReporterRaw !== myName) return false;
+            }
+            return true;
+        });
+
+        function checkIsOverdue(item) {
+            if (item.status === "待處理" || item.status === "處理中") {
+                if (item.reportTime && item.reportTime !== "-") {
+                    let reportDate = new Date(item.reportTime.replace(/\//g, '-'));
+                    let now = new Date();
+                    let diffDays = (now - reportDate) / (1000 * 60 * 60 * 24);
+                    if (diffDays > 3) return true;
+                }
+            }
+            return false;
+        }
+
+        filteredData.sort((a, b) => {
+            const aOverdue = checkIsOverdue(a);
+            const bOverdue = checkIsOverdue(b);
+            const aDone = (a.status === "已結案");
+            const bDone = (b.status === "已結案");
+
+            if (aOverdue && !bOverdue) return -1;
+            if (!aOverdue && bOverdue) return 1;
+            if (aDone && !bDone) return 1;
+            if (!aDone && bDone) return -1;
+            return 0;
+        });
+
+        document.getElementById('defectCount').innerText = filteredData.length;
+        document.getElementById('noDefectMessage').classList.toggle('hidden', filteredData.length > 0);
+       
+        filteredData.forEach(item => {
+            const card = document.createElement('div');
+            card.className = "defect-item";
+            card.addEventListener('click', function() { openDetailModal(item); });
+
+            let statusBadgeClass = "todo"; 
+            if (item.status === "處理中") statusBadgeClass = "processing";
+            if (item.status === "待審核") statusBadgeClass = "checking";
+            if (item.status === "已結案") statusBadgeClass = "done";
+
+            let isOverdue = checkIsOverdue(item);
+            let factoryStyle = getFactoryBadgeStyle(item.factory);
+            let floorStyle = getFloorBadgeStyle(item.floor);
+
+            card.innerHTML = `
+                <div class="defect-header">
+                    <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                        <span class="badge" style="${factoryStyle}">${item.factory}</span>
+                        <span class="badge" style="${floorStyle}">${item.floor}</span>
+                        <span class="badge badge-category">🏷️ ${item.category || "其他"}</span>
+                        <span style="font-size:13px; color:#475569; font-weight:bold; margin-left:4px;">📍 ${item.location}</span>
+                    </div>
+                    <div>
+                        ${isOverdue ? '<span class="badge" style="background:#fee2e2; color:#ef4444; border:1px solid #fca5a5;">⚠️ 逾期未結</span>' : ''}
+                        <span class="badge ${statusBadgeClass}">${item.status}</span>
+                    </div>
+                </div>
+                <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.4;">
+                    ${item.description}
+                </div>
+                <div class="stamp-box">
+                    通報: ${item.reporterName} | ${item.reportTime}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openDetailModal(item) {
+        currentEditingItem = item;
+        document.getElementById('detId').innerText = item.id || "-";
+        document.getElementById('detFactory').innerText = item.factory || "-";
+        document.getElementById('detFloor').innerText = item.floor || "-";
+        document.getElementById('detReporter').innerText = item.reporterName || "-";
+        document.getElementById('detLocation').innerText = item.location || "-";
+        document.getElementById('detReportTime').innerText = item.reportTime || "-";
+        document.getElementById('detDescription').innerText = item.description || "-";
+
+        document.getElementById('imgBefore').src = formatBase64Src(item.beforePhoto);
+        document.getElementById('imgAfter').src = formatBase64Src(item.afterPhoto);
+
+        currentWorkerPhotoBase64 = item.afterPhoto || "";
+
+        const workerSection = document.getElementById('workerSection');
+        const managerSection = document.getElementById('managerSection');
+        
+        workerSection.style.display = "none";
+        managerSection.style.display = "none";
+        document.getElementById('managerCommentInput').style.display = "none";
+        document.getElementById('managerCommentView').style.display = "none";
+        document.getElementById('managerActionButtons').style.display = "none";
+        document.getElementById('managerMeta').innerText = "";
+
+        if (currentUserRole === "worker") {
+            workerSection.style.display = "block";
+            if (item.status === "待處理") {
+                workerSection.innerHTML = `
+                    <h4 style="font-weight: bold; color: #ea580c; margin-top: 0; font-size: 14px; margin-bottom: 8px;">🛠️ 工務維修面板 (接收任務)</h4>
+                    <div class="form-group">
+                        <label>📝 工務初步評估與預計處理說明</label>
+                        <textarea id="inputReceiveNote" rows="2" placeholder="例如：零件需調貨，預計明日處理..."></textarea>
+                    </div>
+                    <button onclick="acceptTask()" class="action-btn worker" style="background: #f59e0b;">✅ 確認接收並開始處理</button>
+                `;
+            } else if (item.status === "處理中") {
+                workerSection.innerHTML = `
+                    <h4 style="font-weight: bold; color: #ea580c; margin-top: 0; margin-bottom: 8px; font-size: 14px;">🛠️ 維修進行中</h4>
+                    <div style="font-size:12px; color:#475569; margin-bottom:8px; background:#fff; padding:6px; border-radius:4px; border:1px solid #fed7aa;">
+                        <b>接收人員：</b>${item.receiverName || "-"}<br>
+                        <b>接收時間：</b>${item.receivedTime || "-"}<br>
+                        <b>初估意見：</b>${item.receiveNote || "無"}
+                    </div>
+                    <div class="form-group">
+                        <label>🔧 實際維修人員姓名</label>
+                        <input type="text" id="inputWorkerName" value="${currentUserRealName}" placeholder="例如：王小工(工務部)">
+                    </div>
+                    <div class="form-group">
+                        <label>🔧 維修完成狀況說明</label>
+                        <textarea id="inputWorkerDesc" rows="2" placeholder="例如：已更換保險絲並測試正常..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>📸 上傳維修完成照</label>
+                        <input type="file" id="workerPhotoFile" accept="image/*">
+                    </div>
+                    <button onclick="submitWorkerReport()" class="action-btn worker">🚀 送出維修結果</button>
+                `;
+                document.getElementById('workerPhotoFile').addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if(file) {
+                        compressWorkerImage(file, function(base64) { 
+                            currentWorkerPhotoBase64 = base64;
+                            document.getElementById('imgAfter').src = base64;
+                        });
+                    }
+                });
+            } else {
+                workerSection.style.display = "block";
+                workerSection.innerHTML = `
+                    <h4 style="font-weight: bold; color: #ea580c; margin-top: 0; margin-bottom: 4px; font-size: 14px;">🛠️ 工務維修紀錄</h4>
+                    <div style="font-size:13px; line-height:1.5;">
+                        <b>接收人員：</b>${item.receiverName || "-"}<br>
+                        <b>接收時間：</b>${item.receivedTime || "-"}<br>
+                        <b>初估意見：</b>${item.receiveNote || "無"}<br>
+                        <b>維修人員：</b>${item.workerName || "-"}<br>
+                        <b>改善時間：</b>${item.workerTime || "-"}<br>
+                        <b>改善說明：</b>${item.workerDesc || "-"}
+                    </div>
+                `;
+            }
+        } else if (item.receiverName || item.workerName || item.receivedTime) {
+            workerSection.style.display = "block";
+            workerSection.innerHTML = `
+                <h4 style="font-weight: bold; color: #ea580c; margin-top: 0; margin-bottom: 4px; font-size: 14px;">🛠️ 工務缺失改善紀錄</h4>
+                <div style="font-size:13px; line-height:1.5;">
+                    <b>接收人員：</b>${item.receiverName || "-"}<br>
+                    <b>接收時間：</b>${item.receivedTime || "-"}<br>
+                    <b>初估意見：</b>${item.receiveNote || "無"}<br>
+                    <b>維修人員：</b>${item.workerName || "-"}<br>
+                    <b>改善時間：</b>${item.workerTime || "-"}<br>
+                    <b>改善說明：</b>${item.workerDesc || "-"}
+                </div>
+            `;
+        }
+
+        const canManagerAction = (item.status === "待審核" && currentUserRole === "manager");
+        const hasManagerRecord = (item.managerName && item.managerName.trim() !== "" && item.managerName !== "-");
+
+        if (canManagerAction || hasManagerRecord) {
+            managerSection.style.display = "block";
+            if (canManagerAction) {
+                document.getElementById('managerCommentInput').style.display = "block";
+                document.getElementById('managerCommentInput').value = "";
+                document.getElementById('managerActionButtons').style.display = "flex";
+            }
+            if (hasManagerRecord) {
+                document.getElementById('managerCommentView').style.display = "block";
+                document.getElementById('managerCommentView').innerText = item.managerComment || "無評語";
+                document.getElementById('managerMeta').innerText = `審核主管: ${item.managerName} | 時間: ${item.managerTime}`;
+            }
+        }
+
+        document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.add('hidden');
+        currentEditingItem = null;
+    }
+
+    function acceptTask() {
+        if (!currentEditingItem) return;
+        const note = document.getElementById('inputReceiveNote').value.trim();
+        currentEditingItem.status = "處理中";
+        currentEditingItem.receiverName = currentUserRealName;
+        currentEditingItem.receivedTime = getFormattedTime();
+        currentEditingItem.receiveNote = note || "已接單處理";
+        saveToCloud("UPDATE_PROCESSING", currentEditingItem);
+        closeDetailModal();
+    }
+
+    function submitWorkerReport() {
+        if (!currentEditingItem) return;
+        const wName = document.getElementById('inputWorkerName') ? document.getElementById('inputWorkerName').value.trim() : currentUserRealName;
+        const desc = document.getElementById('inputWorkerDesc').value.trim();
+        if (!desc) { alert("請填寫改善狀況說明！"); return; }
+        
+        currentEditingItem.status = "待審核";
+        currentEditingItem.workerName = wName || currentUserRealName;
+        currentEditingItem.workerDesc = desc;
+        currentEditingItem.workerTime = getFormattedTime();
+        currentEditingItem.afterPhoto = currentWorkerPhotoBase64;
+        saveToCloud("UPDATE", currentEditingItem);
+        closeDetailModal();
+    }
+
+    function submitAudit(auditType, statusText) {
+        if (!currentEditingItem) return;
+        const comment = document.getElementById('managerCommentInput').value.trim();
+        currentEditingItem.status = statusText;
+        currentEditingItem.managerComment = comment || (auditType === 'APPROVE' ? "核准結案" : "退回重做");
+        currentEditingItem.managerName = currentUserRealName;
+        currentEditingItem.managerTime = getFormattedTime();
+        saveToCloud("UPDATE_MANAGER", currentEditingItem);
+        closeDetailModal();
+    }
+
+    function updateChartDateRange() {
+        const targetData = getFilteredDatabaseForCharts();
+        if (!targetData || targetData.length === 0) {
+            let label = currentChartFilter === 'MONTH' ? '當月' : (currentChartFilter === 'YEAR' ? '本年度' : '全部');
+            document.getElementById('chartDateRange').innerText = `📅 統計區間 (${label})：目前無資料`;
+            return;
+        }
+        
+        let dates = targetData
+            .map(item => item.reportTime)
+            .filter(t => t && t !== '-' && t.length >= 7);
+            
+        if (dates.length > 0) {
+            dates.sort();
+            let earliest = dates[0].substring(0, 7).replace('/', '年') + '月';
+            let latest = dates[dates.length - 1].substring(0, 7).replace('/', '年') + '月';
+            let prefix = currentChartFilter === 'MONTH' ? '📅 當月區間：' : (currentChartFilter === 'YEAR' ? '📈 本年度區間：' : '📅 統計區間：');
+            document.getElementById('chartDateRange').innerText = `${prefix}${earliest} ～ ${latest}`;
+        } else {
+            document.getElementById('chartDateRange').innerText = "📅 統計區間：無有效時間數據";
+        }
+    }
+
+    function renderCategoryPieChart() {
+        const targetData = getFilteredDatabaseForCharts();
+        const stats = {
+            "設施與結構類": 0,
+            "機電與照明類": 0,
+            "空調與消防類": 0,
+            "環安與防護類": 0,
+            "其他": 0
+        };
+
+        targetData.forEach(item => {
+            if (stats[item.category] !== undefined) {
+                stats[item.category]++;
+            } else {
+                stats["其他"]++;
+            }
+        });
+
+        const labels = Object.keys(stats);
+        const dataValues = Object.values(stats);
+
+        if (window.myPieChart) {
+            window.myPieChart.destroy();
+        }
+
+        const ctx = document.getElementById('categoryPieChart').getContext('2d');
+        window.myPieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } }
+                }
+            }
+        });
+    }
+
+    function renderFactoryBarChart() {
+        const targetData = getFilteredDatabaseForCharts();
+        const factoryStats = {
+            "本廠": 0,
+            "二廠": 0,
+            "三廠": 0,
+            "宿舍": 0,
+            "KD大樓": 0,
+            "其他": 0
+        };
+
+        targetData.forEach(item => {
+            let f = item.factory ? item.factory.trim() : "其他";
+            if (factoryStats[f] !== undefined) {
+                factoryStats[f]++;
+            } else {
+                factoryStats["其他"] = (factoryStats["其他"] || 0) + 1;
+            }
+        });
+
+        const labels = Object.keys(factoryStats);
+        const dataValues = Object.values(factoryStats);
+
+        if (window.myFactoryChart) {
+            window.myFactoryChart.destroy();
+        }
+
+        const ctx = document.getElementById('factoryBarChart').getContext('2d');
+        window.myFactoryChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '通報件數',
+                    data: dataValues,
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.7)',
+                        'rgba(16, 185, 129, 0.7)',
+                        'rgba(245, 158, 11, 0.7)',
+                        'rgba(139, 92, 246, 0.7)',
+                        'rgba(239, 68, 68, 0.7)',
+                        'rgba(107, 114, 128, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgb(59, 130, 246)',
+                        'rgb(16, 185, 129)',
+                        'rgb(245, 158, 11)',
+                        'rgb(139, 92, 246)',
+                        'rgb(239, 68, 68)',
+                        'rgb(107, 114, 128)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const selectedFactory = labels[index];
+
+                        let typeCount = {};
+                        let factoryItems = targetData.filter(item => {
+                            let f = item.factory ? item.factory.trim() : "其他";
+                            return f === selectedFactory;
+                        });
+
+                        factoryItems.forEach(item => {
+                            let cat = item.category || "其他";
+                            typeCount[cat] = (typeCount[cat] || 0) + 1;
+                        });
+
+                        let summaryText = `🏢 【${selectedFactory}】通報類型統計：\n`;
+                        if (factoryItems.length === 0) {
+                            summaryText += "目前選擇的區間無任何通報記錄。";
+                        } else {
+                            for (let [cat, count] of Object.entries(typeCount)) {
+                                summaryText += `- ${cat}: ${count} 筆\n`;
+                            }
+                        }
+
+                        alert(summaryText);
+                        document.getElementById('filterFactory').value = selectedFactory;
+                        setSelectFilter('factory', selectedFactory);
+                        switchTab(2);
+                    }
+                }
+            }
+        });
+    }
+
+    // 通用圖表下載函式
+    function downloadChart(canvasId, filename) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            alert("找不到圖表畫布！");
+            return;
+        }
+        const imageURL = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = imageURL;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    </script>
+</body>
+</html>
