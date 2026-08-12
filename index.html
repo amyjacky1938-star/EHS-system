@@ -95,9 +95,9 @@
 
         /* 照片比對排版 */
         .photo-grid { display: flex; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
-        .photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; overflow: visible; }
+        .photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; overflow: visible !important; height: auto !important; }
         .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
-        .photo-box img { width: 100%; height: auto; max-height: none; object-fit: unset; border-radius: 4px; background: #f8fafc; cursor: pointer; transition: 0.2s; display: block; }
+        .photo-box img { width: 100% !important; height: auto !important; max-height: none !important; object-fit: unset !important; border-radius: 4px; background: #f8fafc; cursor: pointer; transition: 0.2s; display: block; }
         .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
 
         .action-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
