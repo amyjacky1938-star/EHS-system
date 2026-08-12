@@ -97,7 +97,17 @@
 .photo-grid { display: flex; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
 .photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; }
 .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
-.photo-box img { width: 100% !important; height: 180px !important; object-fit: contain !important; border-radius: 4px; background: #f8fafc; cursor: pointer; transition: 0.2s; display: block; }
+.photo-box img { 
+    width: 100% !important; 
+    height: auto !important; 
+    aspect-ratio: 4 / 3 !important; 
+    object-fit: cover !important; 
+    border-radius: 4px; 
+    background: #f8fafc; 
+    cursor: pointer; 
+    transition: 0.2s; 
+    display: block; 
+}
 .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
 
         .action-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
