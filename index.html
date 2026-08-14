@@ -98,16 +98,11 @@
 .photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; }
 .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
 .photo-box img { 
-    width: 100% !important; 
-    height: auto !important; 
-    max-height: 200px !important; 
-    object-fit: contain !important; 
-    border-radius: 4px; 
-    background: #f8fafc; 
-    cursor: pointer; 
-    transition: 0.2s; 
-    display: block; 
-    margin: 0 auto;
+    width: 100%;
+    height: auto;      /* 不要固定高度 */
+    max-height: 250px; /* 限制最大高度，避免過大 */
+    object-fit: contain; /* 確保圖片完整縮放進容器內，不被裁切 */
+    display: block;
 }
 .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
 
