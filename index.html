@@ -99,9 +99,9 @@
 .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
 .photo-box img { 
     width: 100% !important; 
-    height: auto !important; 
-    max-height: 200px !important; 
-    object-fit: contain !important; /* 確保圖片保持比例完整塞進框內，絕對不裁切 */
+    height: 160px !important; /* 固定預覽框的高度，避免高度塌陷或被切掉一半 */
+    object-fit: cover !important; /* 讓圖片自動填滿區塊並保持中心對齊，不會變形或只顯示一半 */
+    border-radius: 4px;
     display: block; 
     margin: 0 auto;
 }
