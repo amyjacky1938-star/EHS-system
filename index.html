@@ -94,21 +94,55 @@
         .stamp-box { font-size: 11px; color: #94a3b8; margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 6px; }
 
 /* 照片比對排版修正 */
-.photo-grid { display: flex; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
-.photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
+.photo-grid {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    margin-top: 10px;
+    align-items: flex-start;
+}
+.photo-box {
+    flex: 1;
+    min-width: 0;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+.photo-box span {
+    display: block;
+    width: 100%;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #475569;
+}
 .photo-box img {
     display: block;
     width: auto !important;
     height: auto !important;
     max-width: 100% !important;
-    max-height: 300px !important;
+    max-height: 360px !important;
     object-fit: contain !important;
     background-color: #ffffff;
     border-radius: 4px;
     margin: 0 auto;
+    cursor: zoom-in;
 }
-.photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
+.photo-box img:hover { opacity: 0.8; transform: scale(1.01); }
+
+/* 手機直式照片也要完整顯示，不裁切、不強迫變成橫式 */
+@media (max-width: 600px) {
+    .photo-grid { gap: 8px; }
+    .photo-box { padding: 6px; }
+    .photo-box img { max-height: 420px !important; }
+}
+
 
         .action-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
         .action-btn.worker { background: #2563eb; color: white; }
@@ -260,7 +294,7 @@
                 <textarea id="inputDescription" rows="3" placeholder="請詳細描述現場發現的異常狀況..."></textarea>
                 
                 <label style="margin-top:12px; color:var(--danger)">📸 現場缺失拍照上傳 </label>
-                <input type="file" id="photoFile" accept="image/*" style="background:white; border:1px solid #fca5a5;">
+                <input type="file" id="photoFile" accept="image/*" capture="environment" style="background:white; border:1px solid #fca5a5;">
             </div>
 
             <button onclick="executeReportSubmit()" class="btn-submit">送出異常通報</button>
@@ -528,82 +562,99 @@
         return "";
     }
 
+    /*
+     * 圖片處理：保留原始長寬比例，絕不裁切。
+     * 重要：Power Automate -> Excel 的流程不適合存放 95,000 字元的 Base64。
+     * 因此將 Base64 控制在約 28,000 字元內，避免 Excel 儲存格文字上限造成資料被截斷。
+     */
     function compressImage(file, callback) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
-                let width = img.width;
-                let height = img.height;
-                const GOLDEN_WIDTH = 700;
-                if (width > GOLDEN_WIDTH) {
-                    height = height * (GOLDEN_WIDTH / width);
-                    width = GOLDEN_WIDTH;
+                let width = img.naturalWidth || img.width;
+                let height = img.naturalHeight || img.height;
+                const MAX_WIDTH = 720;
+
+                // 只縮小，不放大；完整保留原始比例
+                if (width > MAX_WIDTH) {
+                    const ratio = MAX_WIDTH / width;
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
                 }
+
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
-                const ctx = canvas.getContext('2d');
+
+                const ctx = canvas.getContext('2d', { alpha: false });
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
                 ctx.drawImage(img, 0, 0, width, height);
-                
-                let quality = 0.82;
+
+                let quality = 0.78;
                 let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                while (compressedBase64.length > 30000 && quality > 0.4) {
-                    quality -= 0.05;
+
+                // 目標低於 Excel 單一儲存格 32,767 字元限制，預留安全空間
+                while (compressedBase64.length > 28000 && quality > 0.35) {
+                    quality = Math.max(0.35, quality - 0.05);
                     compressedBase64 = canvas.toDataURL('image/jpeg', quality);
                 }
+
+                // 如果仍然太大，再縮小畫布；仍然不裁切、不改變比例
+                if (compressedBase64.length > 28000) {
+                    const scale = 0.75;
+                    const smallerCanvas = document.createElement('canvas');
+                    smallerCanvas.width = Math.max(1, Math.round(width * scale));
+                    smallerCanvas.height = Math.max(1, Math.round(height * scale));
+                    const smallerCtx = smallerCanvas.getContext('2d', { alpha: false });
+                    smallerCtx.imageSmoothingEnabled = true;
+                    smallerCtx.imageSmoothingQuality = 'high';
+                    smallerCtx.fillStyle = '#ffffff';
+                    smallerCtx.fillRect(0, 0, smallerCanvas.width, smallerCanvas.height);
+                    smallerCtx.drawImage(img, 0, 0, smallerCanvas.width, smallerCanvas.height);
+                    compressedBase64 = smallerCanvas.toDataURL('image/jpeg', 0.65);
+                }
+
                 callback(compressedBase64);
+            };
+            img.onerror = function() {
+                alert('❌ 圖片讀取失敗，請重新選擇照片。');
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
     }
 
-    // 已修正重複宣告，統一採用高畫質優化版
     function compressWorkerImage(file, callback) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                let width = img.width;
-                let height = img.height;
-                const WORKER_WIDTH = 1000;
-                if (width > WORKER_WIDTH) {
-                    height = height * (WORKER_WIDTH / width);
-                    width = WORKER_WIDTH;
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                let quality = 0.82;
-                let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                while (compressedBase64.length > 95000 && quality > 0.3) {
-                    quality -= 0.05;
-                    compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                }
-                callback(compressedBase64);
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+        // 改善完成照使用與通報缺失照完全相同的安全壓縮邏輯
+        compressImage(file, callback);
     }
 
     function formatBase64Src(str) {
-        if (!str || str === "undefined" || str === "null" || str.trim() === "") {
+        if (!str || str === "undefined" || str === "null") {
             return "https://placehold.co/400x300?text=No+Image";
         }
-        let clean = str.trim().replace(/^"|"$/g, '').replace(/\\/g, '').replace(/\s/g, '');   
-        if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image')) {
+
+        let clean = String(str)
+            .trim()
+            .replace(/^"|"$/g, '')
+            .replace(/\\/g, '')
+            .replace(/\s/g, '');
+
+        if (!clean) return "https://placehold.co/400x300?text=No+Image";
+
+        if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image/')) {
             return clean;
         }
-        if (clean.length > 30) return "data:image/jpeg;base64," + clean;
+
+        // 純 Base64 圖片資料
+        if (clean.length > 30) {
+            return "data:image/jpeg;base64," + clean;
+        }
+
         return "https://placehold.co/400x300?text=No+Image";
     }
 
@@ -1045,8 +1096,24 @@
         document.getElementById('detReportTime').innerText = item.reportTime || "-";
         document.getElementById('detDescription').innerText = item.description || "-";
 
-        document.getElementById('imgBefore').src = formatBase64Src(item.beforePhoto);
-        document.getElementById('imgAfter').src = formatBase64Src(item.afterPhoto);
+        const beforeImg = document.getElementById('imgBefore');
+        const afterImg = document.getElementById('imgAfter');
+
+        beforeImg.onload = function() {
+            beforeImg.title = `原始比例：${this.naturalWidth} × ${this.naturalHeight}`;
+        };
+        beforeImg.onerror = function() {
+            this.src = "https://placehold.co/400x300?text=Image+Error";
+        };
+        afterImg.onload = function() {
+            afterImg.title = `原始比例：${this.naturalWidth} × ${this.naturalHeight}`;
+        };
+        afterImg.onerror = function() {
+            this.src = "https://placehold.co/400x300?text=Image+Error";
+        };
+
+        beforeImg.src = formatBase64Src(item.beforePhoto);
+        afterImg.src = formatBase64Src(item.afterPhoto);
 
         currentWorkerPhotoBase64 = item.afterPhoto || "";
 
