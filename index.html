@@ -97,14 +97,15 @@
 .photo-grid { display: flex; gap: 12px; margin-bottom: 16px; margin-top: 10px; }
 .photo-box { flex: 1; background: #f1f5f9; border-radius: 6px; padding: 8px; text-align: center; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .photo-box span { display: block; font-size: 12px; font-weight: bold; margin-bottom: 6px; color: #475569; }
-.photo-box img { 
-    width: 100% !important; 
-    height: auto !important; /* 讓高度完全依照圖片比例自動調整，絕對不裁切 */
-    max-height: 220px !important; /* 設定高度上限，避免過長的圖片佔據太多畫面 */
-    object-fit: contain !important; /* 確保完整呈現圖片所有內容 */
-    background-color: #ffffff; 
+.photo-box img {
+    display: block;
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 300px !important;
+    object-fit: contain !important;
+    background-color: #ffffff;
     border-radius: 4px;
-    display: block; 
     margin: 0 auto;
 }
 .photo-box img:hover { opacity: 0.8; transform: scale(1.02); }
@@ -534,7 +535,7 @@
             img.onload = function() {
                 let width = img.width;
                 let height = img.height;
-                const GOLDEN_WIDTH = 1000;
+                const GOLDEN_WIDTH = 700;
                 if (width > GOLDEN_WIDTH) {
                     height = height * (GOLDEN_WIDTH / width);
                     width = GOLDEN_WIDTH;
@@ -549,7 +550,7 @@
                 
                 let quality = 0.82;
                 let compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                while (compressedBase64.length > 95000 && quality > 0.3) {
+                while (compressedBase64.length > 30000 && quality > 0.4) {
                     quality -= 0.05;
                     compressedBase64 = canvas.toDataURL('image/jpeg', quality);
                 }
