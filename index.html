@@ -974,16 +974,10 @@
 
         let baseFilteredData = mockDatabase.filter(item => {
             if (currentUserRole === 'reporter') {
-                const myName = currentUserRealName.split('(')[0].trim();
-                const matchDept = currentUserRealName.match(/\((.*?)\)/);
-                const myDept = matchDept ? matchDept[1] : "";
-                
-                const itemReporterRaw = item.reporterName ? item.reporterName.split('(')[0].trim() : "";
-                
-                const isMyReport = (itemReporterRaw === myName);
-                const isMyDept = myDept && item.reporterName && item.reporterName.includes(`(${myDept})`);
-                
-                if (!isMyReport && !isMyDept) return false;
+                // 現場通報同仁：只能查看「自己姓名 + 自己部門」所建立的通報
+                // reporterName 儲存格式為「姓名(部門)」，因此採完整比對，避免看到同部門其他人的案件。
+                const isMyReport = String(item.reporterName || '').trim() === String(currentUserRealName || '').trim();
+                if (!isMyReport) return false;
             }
 
             if (currentFilters.factory !== "ALL" && item.factory !== currentFilters.factory) return false;
